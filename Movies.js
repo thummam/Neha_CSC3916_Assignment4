@@ -1,12 +1,21 @@
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
-mongoose.connect(process.env.DB);
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.DB);
+    console.log("Connected to MongoDB");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    process.exit(1); // Exit the process if the connection fails (optional)
+  }
+};
+
+connectDB();
 
 // Movie schema
 var MovieSchema = new Schema({
 
 });
 
-// return the model
 module.exports = mongoose.model('Movie', MovieSchema);

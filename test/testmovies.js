@@ -1,5 +1,5 @@
-let envPath = __dirname + "/../.env"
-require('dotenv').config({path:envPath});
+let envPath = __dirname + "/../.env";
+require('dotenv').config({ path: envPath });
 let chai = require('chai');
 let chaiHttp = require('chai-http');
 let server = require('../server');
@@ -9,98 +9,95 @@ chai.should();
 
 chai.use(chaiHttp);
 
-let login_details = {
-    name: 'test2',
-    username: 'email2@email.com',
-    password: '123@abc'
-}
+const testData = {
+    user: {
+        name: 'test2',
+        username: 'email2@email.com',
+        password: '123@abc'
+    },
+    movie: {
+        title: 'Alice in Wonderland',
+        releaseDate: 2010,
+        genre: 'Fantasy',
+        actors: [
+            { actorName: 'Mia Wasikowska', characterName: 'Alice Kingsleigh' },
+            { actorName: 'Johnny Depp', characterName: 'Mad Hatter' },
+            { actorName: 'Helena Bonham Carter', characterName: 'Red Queen' }
+        ]
+    }
+};
 
-let movie_details = {
-    title: 'Alice in Wonderland',
-    releaseDate: 2010,
-    genre: 'Fantasy',
-    actors: [ { actorName: 'Mia Wasikowska', characterName: 'Alice Kingsleigh' }, { actorName: 'Johnny Depp', characterName: 'Mad Hatter' }, { actorName: 'Helena Bonham Carter', characterName: 'Red Queen' } ]
-}
 
-let token = ''
+let token = '';
 
 describe('Test Movie Routes', () => {
-   before((done) => { //Before  test initialize the database to empty
-        User.deleteOne({ name: 'test2'}, function(err, user) {
-            if (err) throw err;
-        });
-       
-        Movie.deleteOne({ title: 'Alice in Wonderland'}, function(err, user) {
-            if (err) throw err;
-        });
-       done();
-    })
-
-    after((done) => { //after this test suite empty the database
-        User.deleteOne({ name: 'test2'}, function(err, user) {
-            if (err) throw err;
-        });
-       
-        Movie.deleteOne({ title: 'Alice in Wonderland'}, function(err, user) {
-            if (err) throw err;
-        });
-        done();
-    })
-
-    describe('/signup', () => {
-        it('it should register, login and check our token', (done) => {
-          chai.request(server)
-              .post('/signup')
-              .send(login_details)
-              .end((err, res) =>{
-                res.should.have.status(200);
-                res.body.success.should.be.eql(true);
-                //follow-up to get the JWT token
-                chai.request(server)
-                    .post('/signin')
-                    .send(login_details)
-                    .end((err, res) => {
-                        res.should.have.status(200);
-                        res.body.should.have.property('token');
-                        token = res.body.token;
-                        done();
-                    })
-              })
-        })
+    before(async () => {
+        try {
+            await Promise.all([
+                User.deleteOne({ name: 'test2' }),
+                Movie.deleteOne({ title: 'Alice in Wonderland' })
+            ]);
+        } catch (error) {
+            console.error("Error in setup:", error);
+            throw error;
+        }
     });
 
-    //Test the POST route
-    describe('POST Movies', () => {
-        it('it return all movies', (done) => {
-            chai.request(server)
+    describe('/signup and authentication', () => {
+        it('should register user, login, and get token', async () => {
+            const signupRes = await chai.request(server)
+                .post('/signup')
+                .send(testData.user);
+            
+            signupRes.should.have.status(201);
+            signupRes.body.success.should.be.eql(true);
+
+            const signinRes = await chai.request(server)
+                .post('/signin')
+                .send(testData.user);
+                
+            signinRes.should.have.status(200);
+            signinRes.body.should.have.property('token');
+            token = signinRes.body.token;
+        });
+    });
+
+    describe('Movie Operations', () => {
+        it('should add a new movie', async () => {
+            const res = await chai.request(server)
                 .post('/movies')
                 .set('Authorization', token)
-                .send(movie_details)
-                .end((err, res) => {
-                    res.should.have.status(200);
-                    done();
-                })
-        })
+                .send(testData.movie);
+                
+            res.should.have.status(201);
+            res.body.should.be.an('object');
+            res.body.should.have.property('movie');
+            res.body.movie.should.have.property('title', testData.movie.title);
+        });
+
+        it('should retrieve all movies', async () => {
+            const res = await chai.request(server)
+                .get('/movies')
+                .set('Authorization', token);
+                
+            res.should.have.status(200);
+            res.body.should.be.an('array');
+            res.body.should.have.length.of.at.least(1);
+            
+            const addedMovie = res.body.find(m => m.title === testData.movie.title);
+            addedMovie.should.have.property('genre', testData.movie.genre);
+        });
     });
 
-    //Test the GET route
-    describe('GET Movies', () => {
-        it('it return all movies', (done) => {
-            chai.request(server)
-                .get('/movies')
-                .set('Authorization', token)
-                .send()
-                .end((err, res) => {
-                    res.should.have.status(200);
-                    res.body.should.be.an('array');
-                    res.body.forEach(movie => {
-                        movie.should.have.property('title')
-                        movie.should.have.property('releaseDate')
-                        movie.should.have.property('genre')
-                        movie.should.have.property('actors')
-                    });
-                    done();
-                })
-        })
+    after(async () => {
+        try {
+            await Promise.all([
+                User.deleteOne({ name: 'test2' }),
+                Movie.deleteOne({ title: 'Alice in Wonderland' })
+            ]);
+        } catch (error) {
+            console.error("Error in cleanup:", error);
+            throw error;
+        }
     });
 });
