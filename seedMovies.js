@@ -65,7 +65,7 @@ const movies = [
     {
         title: "The Godfather",
         releaseDate: 1972,
-        genre: "Crime",
+        genre: "Drama",
         actors: [
             { actorName: "Marlon Brando", characterName: "Vito Corleone" },
             { actorName: "Al Pacino", characterName: "Michael Corleone" }
@@ -74,7 +74,7 @@ const movies = [
     {
         title: "Titanic",
         releaseDate: 1997,
-        genre: "Romance",
+        genre: "Drama",
         actors: [
             { actorName: "Leonardo DiCaprio", characterName: "Jack Dawson" },
             { actorName: "Kate Winslet", characterName: "Rose DeWitt Bukater" }
