@@ -120,11 +120,11 @@ router.route('/reviews')
 
       await review.save();
 
-      // 🔥 Add this block to trigger Google Analytics event
-      const movie = await Movie.findById(req.body.movieId);
-      if (movie) {
-        await trackReviewGA4(movie.title, movie.genre);
-      }
+      // // 🔥 Add this block to trigger Google Analytics event
+      // const movie = await Movie.findById(req.body.movieId);
+      // if (movie) {
+      //   await trackReviewGA4(movie.title, movie.genre);
+      // }
 
       return res.status(201).json({
         success: true,
