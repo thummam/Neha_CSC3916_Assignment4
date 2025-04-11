@@ -8,7 +8,6 @@ const cors = require('cors');
 const User = require('./Users');
 const Movie = require('./Movies'); // You're not using Movie, consider removing it
 const Review = require('./Reviews');
-const trackReviewGA4 = require('./analytics');
 const mongoose = require('mongoose');
 
 const app = express();
