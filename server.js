@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const User = require('./Users');
 const Movie = require('./Movies'); // You're not using Movie, consider removing it
+const Review = require('./Reviews');
+const trackReviewGA4 = require('./analytics');
 const mongoose = require('mongoose');
 
 const app = express();
@@ -84,17 +86,117 @@ router.post('/signin', async (req, res) => { // Use async/await
   }
 });
 
+router.route('/reviews')
+  .get(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+      const reviews = await Review.find({});
+      return res.json(reviews);
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error retrieving reviews',
+        error: err.message
+      });
+    }
+  })
+  .post(authJwtController.isAuthenticated, async (req, res) => {
+    try {
+
+      // Validate required fields
+      const requiredFields = ['movieId', 'review', 'rating'];
+      const missingFields = requiredFields.filter(field => !req.body[field]);
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Missing required fields: ${missingFields.join(', ')}`
+        });
+      }
+      
+      const review = new Review({
+        movieId: req.body.movieId,
+        username: req.user.username,
+        review: req.body.review,
+        rating: req.body.rating
+      });
+
+      await review.save();
+
+      // 🔥 Add this block to trigger Google Analytics event
+      const movie = await Movie.findById(req.body.movieId);
+      if (movie) {
+        await trackReviewGA4(movie.title, movie.genre);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: 'Review created!',
+        review: review
+      });
+
+    } catch (err) {
+      if (err.code === 11000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Duplicate review'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating review',
+        error: err.message
+      });
+    }
+  });
+
+
 // Movies CRUD Routes
 router.route('/movies')
     // Get all movies
     .get(authJwtController.isAuthenticated, async (req, res) => {
-        try {
-            const movies = await Movie.find();
-            res.status(200).json({ success: true, data: movies });
-        } catch (err) {
-            res.status(500).json({ success: false, message: 'Error fetching movies', error: err });
-        }
-    })
+      try {
+          if (req.query.reviews === "true") {
+              const movies = await Movie.aggregate([
+                  {
+                      $lookup: {
+                          from: "reviews",
+                          localField: "_id",
+                          foreignField: "movieId",
+                          as: "reviews"
+                      }
+                  },
+                  {
+                      $addFields: {
+                          avgRating: {
+                              $cond: {
+                                  if: { $gt: [{ $size: "$reviews" }, 0] },
+                                  then: { $avg: "$reviews.rating" },
+                                  else: null
+                              }
+                          }
+                      }
+                  },
+                  {
+                      $sort: {
+                          avgRating: -1,
+                          title: 1 // Secondary sort by title when ratings are equal
+                      }
+                  }
+              ]);
+              return res.json(movies);
+          } else {
+              const movies = await Movie.find().sort({ title: 1 });
+              return res.json(movies);
+          }
+      } catch (err) {
+          return res.status(500).json({
+              success: false,
+              message: "Error retrieving movies",
+              error: err.message
+          });
+      }
+  })
+  
 
     // Add a new movie
     .post(authJwtController.isAuthenticated, async (req, res) => {
@@ -153,19 +255,59 @@ router.route('/movies')
     });
 
 router.get('/movies/:movieId', authJwtController.isAuthenticated, async (req, res) => {
-    try {
-        const movieId = req.params.movieId;
-        const movie = await Movie.findOne({ _id: movieId });
+  try {
+    const movieId = req.params.movieId;
 
-        if (!movie) {
-            return res.status(404).json({ success: false, message: "Movie not found." });
+    if (req.query.reviews === "true") {
+      const movieWithReviews = await Movie.aggregate([
+        {
+          $match: { _id: new mongoose.Types.ObjectId(movieId) }
+        },
+        {
+          $lookup: {
+            from: "reviews",
+            localField: "_id",
+            foreignField: "movieId",
+            as: "reviews"
+          }
+        },
+        {
+          $addFields: {
+            avgRating: {
+              $cond: {
+                if: { $gt: [{ $size: "$reviews" }, 0] },
+                then: { $avg: "$reviews.rating" },
+                else: null
+              }
+            }
+          }
         }
+      ]);
 
-        res.status(200).json({ success: true, data: movie });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Error fetching movie", error: err });
+      if (!movieWithReviews.length) {
+        return res.status(404).json({ success: false, message: "Movie not found." });
+      }
+
+      return res.status(200).json({ success: true, movie: movieWithReviews[0] });
     }
+
+    // Basic movie fetch without aggregation
+    const movie = await Movie.findOne({ _id: movieId });
+    if (!movie) {
+      return res.status(404).json({ success: false, message: "Movie not found." });
+    }
+
+    res.status(200).json({ success: true, movie });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching movie",
+      error: err.message
+    });
+  }
 });
+  
 
 app.use('/', router);
 
