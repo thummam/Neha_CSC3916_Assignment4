@@ -61,7 +61,26 @@ const movies = [
             { actorName: "Tom Hanks", characterName: "Forrest Gump" },
             { actorName: "Robin Wright", characterName: "Jenny Curran" }
         ]
+    },
+    {
+        title: "The Godfather",
+        releaseDate: 1972,
+        genre: "Crime",
+        actors: [
+            { actorName: "Marlon Brando", characterName: "Vito Corleone" },
+            { actorName: "Al Pacino", characterName: "Michael Corleone" }
+        ]
+    },
+    {
+        title: "Titanic",
+        releaseDate: 1997,
+        genre: "Romance",
+        actors: [
+            { actorName: "Leonardo DiCaprio", characterName: "Jack Dawson" },
+            { actorName: "Kate Winslet", characterName: "Rose DeWitt Bukater" }
+        ]
     }
+    
 ];
 
 // Insert movies into the database
